@@ -52,11 +52,13 @@ mongoose
 // app.use('/retrivetasks', passport.authenticate('jwt', {session: false}), User);
 
 /**
+ * // Function to send sms when task is due on next day
 function sendSMS(contactNo, text) {
   nexmo.message.sendSms(from, contactNo, text);
 }
  */
 
+ // Resource to mark task as complete
 app.post('/complete', (req, res) => {
 
   UserData.updateOne({ "email": req.body.email, "tasks.uid": req.body.uid }, { $set: { "tasks.$.completed": req.body.flag, "tasks.$.completedOn": moment() } }, { upsert: true }, (err, doc)=> {
@@ -68,6 +70,7 @@ app.post('/complete', (req, res) => {
 
 });
 
+// Resource to mark task as archived
 app.post('/delete', (req, res) => {
   UserData.updateOne({ "email": req.body.email, "tasks.uid": req.body.uid }, { $set: { "tasks.$.deleted": req.body.flag, "tasks.$.deletedOn": moment() } }, { upsert: true }, (err, doc)=> {
     if (err) {
@@ -77,10 +80,11 @@ app.post('/delete', (req, res) => {
   });
 });
 
+// Resource to save new task as well as edited task
 app.post('/savetask', (req, res) => {
   let reqData = req.body;
-  // If task is new 
-  if (reqData.task["uid"] == undefined) {
+  // If task is 
+  if (reqData.task["uid"] == undefined) { // if uid is not present then task is new
     reqData.task["uid"] = uuid.v1();
     reqData.task["createdOn"] = moment();
     reqData.task["completed"] = false;
@@ -239,14 +243,15 @@ app.get('/test', (req, res)=> {
 var rule = new schedule.RecurrenceRule();
 rule.hour = 2;
 var trackjob = schedule.scheduleJob(rule, () => {
-  User.find().then(userData => {
+  User.find({}).then(userData => {
     for (let i = 0; i < userData.length; i++) {
       UserData.find({ email: userData[i].email }).then(data => {
         let tasksAry = data[0].tasks;
         let newTasks = [];
+	let today = moment();
         for (let x = 0; x < tasksAry.length; x++) {
           if (tasksAry[x].deletedOn != undefined || tasksAry[x].deletedOn != "undefined") {
-            let today = moment();
+            
             let deletedDate = moment(tasksAry[x].deletedOn);
             if (today.diff(deletedDate, 'days') > 15) {
               //Dont consider the tasks
@@ -258,7 +263,7 @@ var trackjob = schedule.scheduleJob(rule, () => {
           }
         }
 
-        UserData.updateOne({ "email": userData[i].email }, { $set: { tasks: newTasks } }, (err, doc) => {
+        UserData.updateOne({ "email": userData[i].email }, { $set: { tasks: newTasks }}, (err, doc) => {
         });
       });
     }
